@@ -7,19 +7,24 @@ numeros_unicos = new_data['final_label'].unique()
 porcentaje_1 = 0.7
 porcentaje_2 = 0.15
 
-lotes = []
+train_data = pd.DataFrame()
+valid_data = pd.DataFrame()
+test_data = pd.DataFrame()
 
 for numero in numeros_unicos:
     datos_filtrados = new_data[new_data['final_label'] == numero]
     total_filas = len(datos_filtrados)
     filas_lote_1 = int(total_filas * porcentaje_1)
     filas_lote_2 = int(total_filas * porcentaje_2)
-    filas_lote_3 = total_filas - filas_lote_1 - filas_lote_2
-    
-    lote_1 = datos_filtrados[:filas_lote_1]
-    lote_2 = datos_filtrados[filas_lote_1:filas_lote_1+filas_lote_2]
-    lote_3 = datos_filtrados[filas_lote_1+filas_lote_2:]
-    
-    lotes.append((lote_1, lote_2, lote_3))
 
-print(lotes)
+    train_subset = datos_filtrados[:filas_lote_1]
+    valid_subset = datos_filtrados[filas_lote_1:filas_lote_1+filas_lote_2]
+    test_subset = datos_filtrados[filas_lote_1+filas_lote_2:]
+    
+    train_data = pd.concat([train_data, train_subset], ignore_index=True)
+    valid_data = pd.concat([valid_data, valid_subset], ignore_index=True)
+    test_data = pd.concat([test_data, test_subset], ignore_index=True)
+
+train_data.to_csv('ISIC_2019_Train_data_GroundTruth.csv', index=False)
+valid_data.to_csv('ISIC_2019_Valid_data_GroundTruth.csv', index=False)
+test_data.to_csv('ISIC_2019_Test_data_GroundTruth.csv', index=False)
