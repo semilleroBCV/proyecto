@@ -73,3 +73,96 @@ end_time = time.time()
 # Cálculo del tiempo transcurrido
 elapsed_time = end_time - start_time
 print(f"Tiempo transcurrido: {elapsed_time} segundos")
+
+#Modelo 
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        
+        #Capa convolucional 1 
+        self.conv1 = nn.Conv2d(3,32, kernel_size=3, stride=1, padding=1)
+        self.relu1 = nn.ReLU()
+        self.pool1 = nn.MaxPool2d(kernel_size=2)
+        
+        #Capa convolucional 2 
+        self.conv2 = nn.Conv2d(32,64,kernel_size=3, stride=1, padding=1)
+        self.relu2 = nn.ReLU()
+        self.pool2 = nn.MaxPool2d(kernel_size=2)
+        
+        #Capa convolucional 3
+        self.conv3 = nn.Conv2d(64,128,kernel_size=3, stride=1, padding=1)
+        self.relu3 = nn.ReLU()
+        self.pool3 = nn.MaxPool2d(kernel_size=2)
+        
+        # Capa completamente conectada
+        self.fc = nn.Linear(128, 9)  # Ajusta el tamaño de salida
+        
+    def forward(self,x):
+        # Capa convolucional 1
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = self.pool1(x)
+    
+        # Capa convolucional 2
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.pool2(x)
+    
+        # Capa convolucional 3
+        x = self.conv3(x)
+        x = self.relu3(x)
+        x = self.pool3(x)
+    
+        # Aplanar los mapas de características
+        x = x.view(x.size(0), -1)
+    
+        # Capa completamente conectada
+        x = self.fc(x)
+    
+    return x
+
+model = CNN().to(device)
+
+# Definir la función de pérdida y el optimizador
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+def train(model, loader, criterion, optimizer):
+    model.train()
+    train_loss = 0.0 
+    correct_predictions = 0 
+    total_samples = 0
+    true_positives = 0
+    true_negatives = 0 
+    false_positives = 0 
+    false_negatives = 0
+    
+    
+    for images, labels in loader:
+        images, labels = images.to(device), labels.to(device)
+        optimizer.zero_grad()
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optmizer.step()
+        
+        train_loss += loss.item() * images.size(0)
+        _, predicted = torch.max(outputs, 1)
+        correct_predictions += (predicted == labels).sum().item()
+        total_samples += labels.size(0)
+        
+        # Calcular estadísticas para accuracy, precision, recall y F1-score
+        true_positives += ((predicted == 1) & (labels == 1)).sum().item()
+        true_negatives += ((predicted == 0) & (labels == 0)).sum().item()
+        false_positives += ((predicted == 1) & (labels == 0)).sum().item()
+        false_negatives += ((predicted == 0) & (labels == 1)).sum().item()
+
+    train_loss = train_loss / total_samples
+    accuracy = correct_predictions / total_samples
+    precision = true_positives / (true_positives + false_positives)
+    recall = true_positives / (true_positives + false_negatives)
+    f1_score = 2 * (precision * recall) / (precision + recall)
+
+    return train_loss, accuracy, precision, recall, f1_score
+        
+        
