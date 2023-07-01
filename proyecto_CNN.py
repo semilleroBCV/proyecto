@@ -166,3 +166,38 @@ def train(model, loader, criterion, optimizer):
     return train_loss, accuracy, precision, recall, f1_score
         
         
+def evaluate(model, loader, criterion):
+    model.eval()
+    train_loss = 0.0 
+    correct_predictions = 0 
+    total_samples = 0
+    true_positives = 0
+    true_negatives = 0 
+    false_positives = 0 
+    false_negatives = 0
+    
+    with torch.no_grad():
+    for images, labels in loader:
+        images, labels = images.to(device), labels.to(device)
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+
+        eval_loss += loss.item() * images.size(0)
+        _, predicted = torch.max(outputs, 1)
+        correct_predictions += (predicted == labels).sum().item()
+        total_samples += labels.size(0)
+
+        # Calcular estadísticas para accuracy, precision, recall y F1-score
+        true_positives += ((predicted == 1) & (labels == 1)).sum().item()
+        true_negatives += ((predicted == 0) & (labels == 0)).sum().item()
+        false_positives += ((predicted == 1) & (labels == 0)).sum().item()
+        false_negatives += ((predicted == 0) & (labels == 1)).sum().item()
+
+    eval_loss = eval_loss / total_samples
+    accuracy = correct_predictions / total_samples
+    precision = true_positives / (true_positives + false_positives)
+    recall = true_positives / (true_positives + false_negatives)
+    f1_score = 2 * (precision * recall) / (precision + recall)
+
+    return eval_loss, accuracy, precision, recall, f1_score
+    
