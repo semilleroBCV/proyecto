@@ -6,6 +6,7 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from skimage.transform import resize
+import time
 
 #Carga de datos
 train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
@@ -61,7 +62,14 @@ train_dataset = CustomDataset(train_data, train_images, transform=transform)
 test_dataset = CustomDataset(test_data, test_images, transform=transform)
 valid_dataset = CustomDataset(valid_data, valid_images, transform=transform)
 
+start_time = time.time()
+
 train_loader = DataLoader(train_dataset, batch_size=len(train_dataset), shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=True)
 valid_loader = DataLoader(valid_dataset, batch_size=len(valid_dataset), shuffle=True)
 
+end_time = time.time()
+
+# Cálculo del tiempo transcurrido
+elapsed_time = end_time - start_time
+print(f"Tiempo transcurrido: {elapsed_time} segundos")
