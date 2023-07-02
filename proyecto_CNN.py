@@ -6,6 +6,7 @@ import torch.optim as optim
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from skimage.transform import resize
+from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
 import time
 import os
 
@@ -76,8 +77,8 @@ batch_test = 10
 batch_valid = 10
 
 train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
 valid_loader = DataLoader(valid_dataset, batch_size=batch_valid, shuffle=False)
+test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
 
 
 #Modelo 
@@ -133,20 +134,16 @@ model = CNN().to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-def train(model, loader, criterion, optimizer):
+def train(model, train_loader, criterion, optimizer):
     model.train()
     train_loss = 0.0 
     correct_predictions = 0 
     total_samples = 0
-    """
-    true_positives = 0
-    true_negatives = 0 
-    false_positives = 0 
-    false_negatives = 0
-    """
+    train_predictions = []
+    train_labels = []
     
     
-    for images, labels in loader:
+    for images, labels in train_loader:
         images, labels = images.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(images)
@@ -159,6 +156,9 @@ def train(model, loader, criterion, optimizer):
         correct_predictions += (predicted == labels).sum().item()
         total_samples += labels.size(0)
         
+        train_predictions.extend(predicted.cpu().numpy())
+        train_labels.extend(labels.cpu().numpy())
+
         # Calcular estadísticas para accuracy, precision, recall y F1-score TERMINAR
         """
         true_positives += ((predicted == 1) & (labels == 1)).sum().item()
@@ -166,30 +166,48 @@ def train(model, loader, criterion, optimizer):
         false_positives += ((predicted == 1) & (labels == 0)).sum().item()
         false_negatives += ((predicted == 0) & (labels == 1)).sum().item()"""
 
-    #train_loss = train_loss / total_samples
-    accuracy = correct_predictions / total_samples
-    """
-    precision = true_positives / (true_positives + false_positives)
-    recall = true_positives / (true_positives + false_negatives)
-    f1_score = 2 * (precision * recall) / (precision + recall)"""
+    train_loss /= total_samples
+    #accuracy = correct_predictions / total_samples
+    accuracy = accuracy_score(train_labels, train_predictions)
 
-    #return train_loss, accuracy, precision, recall, f1_score
-    return accuracy    
-        
-def evaluate(model, loader, criterion):
+    return accuracy, train_predictions, train_labels  
+
+def validate(model, valid_loader, criterion):
+    model.eval()
+    val_loss = 0.0
+    correct_predictions = 0
+    total_samples = 0
+    val_predictions = []
+    val_labels = []
+
+    with torch.no_grad():
+        for images, labels in valid_loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+
+            val_loss += loss.item() * images.size(0)
+            _, predicted = torch.max(outputs, 1)
+            correct_predictions += (predicted == labels).sum().item()
+            total_samples += labels.size(0)
+
+            val_predictions.extend(predicted.cpu().numpy())
+            val_labels.extend(labels.cpu().numpy())
+
+    accuracy = correct_predictions / total_samples
+
+    return accuracy, val_predictions, val_labels  
+
+def evaluate(model, test_loader, criterion):
     model.eval()
     eval_loss = 0.0 
     correct_predictions = 0 
     total_samples = 0
-    """
-    true_positives = 0
-    true_negatives = 0 
-    false_positives = 0 
-    false_negatives = 0
-    """
-    
+    test_predictions = []
+    test_labels = []
+
     with torch.no_grad():
-        for images, labels in loader:
+        for images, labels in test_loader:
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
             loss = criterion(outputs, labels)
@@ -199,14 +217,10 @@ def evaluate(model, loader, criterion):
             correct_predictions += (predicted == labels).sum().item()
             total_samples += labels.size(0)
 
-            # Calcular estadísticas para accuracy, precision, recall y F1-score TERMINAR!
-            """
-            true_positives += ((predicted == 1) & (labels == 1)).sum().item()
-            true_negatives += ((predicted == 0) & (labels == 0)).sum().item()
-            false_positives += ((predicted == 1) & (labels == 0)).sum().item()
-            false_negatives += ((predicted == 0) & (labels == 1)).sum().item() """
+            test_predictions.extend(predicted.cpu().numpy())
+            test_labels.extend(labels.cpu().numpy())
 
-    #eval_loss = eval_loss / total_samples
+            
     accuracy = correct_predictions / total_samples
     """
     precision = true_positives / (true_positives + false_positives)
@@ -214,17 +228,51 @@ def evaluate(model, loader, criterion):
     f1_score = 2 * (precision * recall) / (precision + recall)"""
 
     #return eval_loss, accuracy, precision, recall, f1_score
-    return accuracy
+    return accuracy, test_predictions, test_labels
     
 num_epochs = 10
+# for epoch in range(num_epochs):
+#     train_accuracy = train(model,train_loader,criterion,optimizer)
+#     test_accuracy = evaluate(model,train_loader,criterion,optimizer)
+#     print(f'Training accuracy: {train_accuracy:.4f}')
+#     print(f'Test accuracy: {test_accuracy:.4f}')
+#     print('---------------------------')
 for epoch in range(num_epochs):
-    train_accuracy = train(model,train_loader,criterion,optimizer)
-    test_accuracy = evaluate(model,train_loader,criterion,optimizer)
-    print(f'Training accuracy: {train_accuracy:.4f}')
-    print(f'Test accuracy: {test_accuracy:.4f}')
+    train_accuracy, train_predictions, train_labels = train(model, train_loader, criterion, optimizer)
+    val_accuracy, val_predictions, val_labels = validate(model, valid_loader, criterion)
+    test_accuracy, test_predictions, test_labels = evaluate(model, test_loader, criterion)
+
+    train_precision = precision_score(train_labels, train_predictions, average=None)
+    train_recall = recall_score(train_labels, train_predictions, average=None)
+    train_f1_score = f1_score(train_labels, train_predictions, average=None)
+
+    val_precision = precision_score(val_labels, val_predictions, average=None)
+    val_recall = recall_score(val_labels, val_predictions, average=None)
+    val_f1_score = f1_score(val_labels, val_predictions, average=None)
+
+    test_precision = precision_score(test_labels, test_predictions, average=None)
+    test_recall = recall_score(test_labels, test_predictions, average=None)
+    test_f1_score = f1_score(test_labels, test_predictions, average=None)
+
+    print(f'Training Loss: {train_loss:.4f} | Training Accuracy: {train_accuracy:.2f}%')
+    print(f'Training Precision: {train_precision}')
+    print(f'Training Recall: {train_recall}')
+    print(f'Training F1-Score: {train_f1_score}')
     print('---------------------------')
-    
-    
+
+    print(f'Validation Loss: {val_loss:.4f} | Validation Accuracy: {val_accuracy:.2f}%')
+    print(f'Validation Precision: {val_precision}')
+    print(f'Validation Recall: {val_recall}')
+    print(f'Validation F1-Score: {val_f1_score}')
+    print('---------------------------')
+
+    print(f'Test Loss: {test_loss:.4f} | Test Accuracy: {test_accuracy:.2f}%')
+    print(f'Test Precision: {test_precision}')
+    print(f'Test Recall: {test_recall}')
+    print(f'Test F1-Score: {test_f1_score}')
+    print('---------------------------')
+
+
 """
 for epoch in range(num_epochs):
     train_loss, train_accuracy, train_precision, train_recall, train_f1_score = train(model,train_loader,criterion,optimizer)
@@ -240,7 +288,7 @@ for epoch in range(num_epochs):
     print(f'F Score: {test_f1_score:.4f}')
     print('---------------------------') 
 """
-    
+
 end_time = time.time()
 
 # Cálculo del tiempo transcurrido
