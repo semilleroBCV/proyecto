@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 from skimage.transform import resize
 import time
 
+start_time = time.time()
 #Carga de datos
 train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
 test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
@@ -23,15 +24,18 @@ path_train = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_In
 path_test = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_Input/{image_id}.jpg" for image_id in image_ids_test]
 path_valid = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_Input/{image_id}.jpg" for image_id in image_ids_valid]
 
+print(len(path_train))
+print(len(path_test))
+print(len(path_valid))
+
 target_size = (224, 224)  # Tamaño objetivo de las imágenes
 
-train_images = []
-test_images = []
-valid_images = []
+
 
 train_images = [resize(io.imread(image_path), target_size) for image_path in path_train]
 test_images = [resize(io.imread(image_path), target_size) for image_path in path_test]
 valid_images = [resize(io.imread(image_path), target_size) for image_path in path_valid]
+
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -62,17 +66,16 @@ train_dataset = CustomDataset(train_data, train_images, transform=transform)
 test_dataset = CustomDataset(test_data, test_images, transform=transform)
 valid_dataset = CustomDataset(valid_data, valid_images, transform=transform)
 
-start_time = time.time()
 
-train_loader = DataLoader(train_dataset, batch_size=len(train_dataset), shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=len(test_dataset), shuffle=True)
-valid_loader = DataLoader(valid_dataset, batch_size=len(valid_dataset), shuffle=True)
 
-end_time = time.time()
+batch_train = 1772
+batch_test = 380
+batch_valid = 379
 
-# Cálculo del tiempo transcurrido
-elapsed_time = end_time - start_time
-print(f"Tiempo transcurrido: {elapsed_time} segundos")
+train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
+valid_loader = DataLoader(valid_dataset, batch_size=batch_valid, shuffle=False)
+
 
 #Modelo 
 class CNN(nn.Module):
@@ -119,7 +122,7 @@ class CNN(nn.Module):
         # Capa completamente conectada
         x = self.fc(x)
     
-    return x
+        return x
 
 model = CNN().to(device)
 
@@ -144,60 +147,91 @@ def train(model, loader, criterion, optimizer):
         outputs = model(images)
         loss = criterion(outputs, labels)
         loss.backward()
-        optmizer.step()
+        optimizer.step()
         
         train_loss += loss.item() * images.size(0)
         _, predicted = torch.max(outputs, 1)
         correct_predictions += (predicted == labels).sum().item()
         total_samples += labels.size(0)
         
-        # Calcular estadísticas para accuracy, precision, recall y F1-score
+        # Calcular estadísticas para accuracy, precision, recall y F1-score TERMINAR
+        """
         true_positives += ((predicted == 1) & (labels == 1)).sum().item()
         true_negatives += ((predicted == 0) & (labels == 0)).sum().item()
         false_positives += ((predicted == 1) & (labels == 0)).sum().item()
-        false_negatives += ((predicted == 0) & (labels == 1)).sum().item()
+        false_negatives += ((predicted == 0) & (labels == 1)).sum().item()"""
 
-    train_loss = train_loss / total_samples
+    #train_loss = train_loss / total_samples
     accuracy = correct_predictions / total_samples
+    """
     precision = true_positives / (true_positives + false_positives)
     recall = true_positives / (true_positives + false_negatives)
-    f1_score = 2 * (precision * recall) / (precision + recall)
+    f1_score = 2 * (precision * recall) / (precision + recall)"""
 
-    return train_loss, accuracy, precision, recall, f1_score
-        
+    #return train_loss, accuracy, precision, recall, f1_score
+    return accuracy    
         
 def evaluate(model, loader, criterion):
     model.eval()
-    train_loss = 0.0 
+    eval_loss = 0.0 
     correct_predictions = 0 
     total_samples = 0
+    """
     true_positives = 0
     true_negatives = 0 
     false_positives = 0 
     false_negatives = 0
+    """
     
     with torch.no_grad():
-    for images, labels in loader:
-        images, labels = images.to(device), labels.to(device)
-        outputs = model(images)
-        loss = criterion(outputs, labels)
+        for images, labels in loader:
+            images, labels = images.to(device), labels.to(device)
+            outputs = model(images)
+            loss = criterion(outputs, labels)
 
-        eval_loss += loss.item() * images.size(0)
-        _, predicted = torch.max(outputs, 1)
-        correct_predictions += (predicted == labels).sum().item()
-        total_samples += labels.size(0)
+            eval_loss += loss.item() * images.size(0)
+            _, predicted = torch.max(outputs, 1)
+            correct_predictions += (predicted == labels).sum().item()
+            total_samples += labels.size(0)
 
-        # Calcular estadísticas para accuracy, precision, recall y F1-score
-        true_positives += ((predicted == 1) & (labels == 1)).sum().item()
-        true_negatives += ((predicted == 0) & (labels == 0)).sum().item()
-        false_positives += ((predicted == 1) & (labels == 0)).sum().item()
-        false_negatives += ((predicted == 0) & (labels == 1)).sum().item()
+            # Calcular estadísticas para accuracy, precision, recall y F1-score TERMINAR!
+            """
+            true_positives += ((predicted == 1) & (labels == 1)).sum().item()
+            true_negatives += ((predicted == 0) & (labels == 0)).sum().item()
+            false_positives += ((predicted == 1) & (labels == 0)).sum().item()
+            false_negatives += ((predicted == 0) & (labels == 1)).sum().item() """
 
-    eval_loss = eval_loss / total_samples
+    #eval_loss = eval_loss / total_samples
     accuracy = correct_predictions / total_samples
+    """
     precision = true_positives / (true_positives + false_positives)
     recall = true_positives / (true_positives + false_negatives)
-    f1_score = 2 * (precision * recall) / (precision + recall)
+    f1_score = 2 * (precision * recall) / (precision + recall)"""
 
-    return eval_loss, accuracy, precision, recall, f1_score
+    #return eval_loss, accuracy, precision, recall, f1_score
+    return accuracy
     
+num_epochs = 10
+for epoch in range(num_epochs):
+    train_loss, train_accuracy, train_precision, train_recall, train_f1_score = train(model,train_loader,criterion,optimizer)
+    test_loss, test_accuracy, test_precision, test_recall, test_f1_score = evaluate(model,train_loader,criterion,optimizer)
+
+
+    print(f'Training Loss: {train_loss:.4f} | Training Accuracy: {train_accuracy:.2f}%')
+    print(f'Training precision: {train_precision:.4f} | Training Accuracy: {train_recall:.2f}%')
+    print(f'F Score: {train_f1_score:.4f}')
+
+    print(f'Test Loss: {test_loss:.4f} | Test Accuracy: {test_accuracy:.2f}%')
+    print(f'Test precision: {test_precision:.4f} | Test Accuracy: {test_recall:.2f}%')
+    print(f'F Score: {test_f1_score:.4f}')
+    print('---------------------------')
+    
+end_time = time.time()
+
+# Cálculo del tiempo transcurrido
+elapsed_time = end_time - start_time
+print(f"Tiempo transcurrido: {elapsed_time} segundos")
+
+
+
+         
