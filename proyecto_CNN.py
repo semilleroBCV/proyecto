@@ -7,8 +7,12 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 from skimage.transform import resize
 import time
+import os
+
 
 start_time = time.time()
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 #Carga de datos
 train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
 test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
@@ -24,13 +28,12 @@ path_train = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_In
 path_test = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_Input/{image_id}.jpg" for image_id in image_ids_test]
 path_valid = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_Input/{image_id}.jpg" for image_id in image_ids_valid]
 
+"""
 print(len(path_train))
 print(len(path_test))
-print(len(path_valid))
+print(len(path_valid))"""
 
 target_size = (224, 224)  # Tamaño objetivo de las imágenes
-
-
 
 train_images = [resize(io.imread(image_path), target_size) for image_path in path_train]
 test_images = [resize(io.imread(image_path), target_size) for image_path in path_test]
@@ -39,6 +42,7 @@ valid_images = [resize(io.imread(image_path), target_size) for image_path in pat
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+device = device1
 transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.1307,), (0.3081,))
@@ -67,10 +71,9 @@ test_dataset = CustomDataset(test_data, test_images, transform=transform)
 valid_dataset = CustomDataset(valid_data, valid_images, transform=transform)
 
 
-
-batch_train = 1772
-batch_test = 380
-batch_valid = 379
+batch_train = 10
+batch_test = 10
+batch_valid = 10
 
 train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
@@ -135,10 +138,12 @@ def train(model, loader, criterion, optimizer):
     train_loss = 0.0 
     correct_predictions = 0 
     total_samples = 0
+    """
     true_positives = 0
     true_negatives = 0 
     false_positives = 0 
     false_negatives = 0
+    """
     
     
     for images, labels in loader:
@@ -213,6 +218,15 @@ def evaluate(model, loader, criterion):
     
 num_epochs = 10
 for epoch in range(num_epochs):
+    train_accuracy = train(model,train_loader,criterion,optimizer)
+    test_accuracy = evaluate(model,train_loader,criterion,optimizer)
+    print(f'Training accuracy: {train_accuracy:.4f}')
+    print(f'Test accuracy: {test_accuracy:.4f}')
+    print('---------------------------')
+    
+    
+"""
+for epoch in range(num_epochs):
     train_loss, train_accuracy, train_precision, train_recall, train_f1_score = train(model,train_loader,criterion,optimizer)
     test_loss, test_accuracy, test_precision, test_recall, test_f1_score = evaluate(model,train_loader,criterion,optimizer)
 
@@ -224,7 +238,8 @@ for epoch in range(num_epochs):
     print(f'Test Loss: {test_loss:.4f} | Test Accuracy: {test_accuracy:.2f}%')
     print(f'Test precision: {test_precision:.4f} | Test Accuracy: {test_recall:.2f}%')
     print(f'F Score: {test_f1_score:.4f}')
-    print('---------------------------')
+    print('---------------------------') 
+"""
     
 end_time = time.time()
 
