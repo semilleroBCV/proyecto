@@ -4,7 +4,14 @@ import torch.optim as optim
 import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
+import pandas as pd
+from skimage import io
+from skimage.transform import resize
+from PIL import Image
+import time
+from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
 
+start_time = time.time()
 # Especificar el dispositivo a utilizar (GPU o CPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -20,6 +27,25 @@ transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))  # Normalización de los valores de los píxeles
 ])
+
+
+class CustomDataset(torch.utils.data.Dataset):
+    def __init__(self, data, transform=None):
+        self.data = data
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        image_id = self.data['image'].iloc[index]
+        image_path = f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_Input/{image_id}.jpg"
+        image = Image.open(image_path)
+        if self.transform:
+            image = self.transform(image)
+        label = self.data['final_label'].iloc[index]
+        return image, label
+
 
 train_dataset = CustomDataset(train_data, transform=transform)
 #test_dataset = CustomDataset(test_data, transform=transform)
@@ -89,3 +115,8 @@ for epoch in range(num_epochs):
 
 # ... Código adicional para evaluar el modelo en el conjunto de validación o prueba ...
 
+end_time = time.time()
+
+# Cálculo del tiempo transcurrido
+elapsed_time = end_time - start_time
+print(f"Tiempo transcurrido: {elapsed_time} segundos")
