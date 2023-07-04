@@ -21,24 +21,25 @@ start_time = time.time()
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 #Carga de datos
 train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
-test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
-valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
+#test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
+#valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
 
 
-image_ids_train = train_data['image'].tolist()
-image_ids_test = test_data['image'].tolist()
-image_ids_valid = valid_data['image'].tolist()
+#image_ids_train = train_data['image'].tolist()
+#image_ids_test = test_data['image'].tolist()
+#image_ids_valid = valid_data['image'].tolist()
 
 
 path_train = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_Input/{image_id}.jpg" for image_id in image_ids_train]
-path_test = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Test_Input/{image_id}.jpg" for image_id in image_ids_test]
-path_valid = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Valid_Input/{image_id}.jpg" for image_id in image_ids_valid]
+#path_test = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Test_Input/{image_id}.jpg" for image_id in image_ids_test]
+#path_valid = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Valid_Input/{image_id}.jpg" for image_id in image_ids_valid]
 #target_size = (782, 647)  # Tamaño objetivo de las imágenes
 
 
 transform = transforms.Compose([
+    transforms.Resize((224, 224)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
     transforms.ToTensor(),
-    transforms.Normalize((0.1307,), (0.3081,))
+    transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))  # Normalización de los valores de los píxeles
 ])
 
 class CustomDataset(torch.utils.data.Dataset):
@@ -52,23 +53,23 @@ class CustomDataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         image_id = self.data['image'].iloc[index]
         image_path = f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_Input/{image_id}.jpg"
-        image = resize(io.imread(image_path), ((32, 32)))
+        image = Image.open(image_path)
         if self.transform:
             image = self.transform(image)
         label = self.data['final_label'].iloc[index]
         return image, label
 
 train_dataset = CustomDataset(train_data, transform=transform)
-test_dataset = CustomDataset(test_data, transform=transform)
-valid_dataset = CustomDataset(valid_data, transform=transform)
+#test_dataset = CustomDataset(test_data, transform=transform)
+#valid_dataset = CustomDataset(valid_data, transform=transform)
 
 batch_train = 196
-batch_test = 10
-batch_valid = 10
+#batch_test = 10
+#batch_valid = 10
 
 train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
-valid_loader = DataLoader(valid_dataset, batch_size=batch_valid, shuffle=False)
-test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
+#valid_loader = DataLoader(valid_dataset, batch_size=batch_valid, shuffle=False)
+#test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
 
 #print(train_loader)
 
@@ -151,28 +152,32 @@ def train(model, train_loader, criterion, optimizer):
         train_labels.extend(labels.cpu().numpy())
 
     train_loss /= total_samples
+    t_loss = train_loss/len(train_loader)
+    acc = 100 * correct_predictions/total_samples
     accuracy = accuracy_score(train_labels, train_predictions)
 
-    return accuracy, train_predictions, train_labels, train_loss
+    return acc, accuracy,train_predictions, train_labels, train_loss, t_loss
+
  
 num_epochs = 10
 for epoch in range(num_epochs):
-    train_accuracy, train_predictions, train_labels, train_loss = train(model, train_loader, criterion, optimizer)
-    
+    acc_manual, train_accuracy, train_predictions, train_labels, train_loss, t_loss_manual = train(model, train_loader, criterion, optimizer)
+
     train_precision = precision_score(train_labels, train_predictions, average=None)
     train_recall = recall_score(train_labels, train_predictions, average=None)
     train_f1_score = f1_score(train_labels, train_predictions, average=None)
 
     print(f'Training Loss: {train_loss:.4f} | Training Accuracy: {train_accuracy:.2f}%')
+    print(f'Training Loss manual: {t_loss_manual:.4f} | Training Accuracy manual: {acc_manual:.2f}%')
     print(f'Training Precision: {train_precision}')
     print(f'Training Recall: {train_recall}')
     print(f'Training F1-Score: {train_f1_score}')
     print('---------------------------')
 
+
 end_time = time.time()
 
-# Cálculo del tiempo transcurrido
-elapsed_time = end_time - start_time
-print(f"Tiempo transcurrido: {elapsed_time} segundos")
-
+# Cálculo del tiempo transcurrido en horas
+elapsed_time = (end_time - start_time) / 3600
+print(f"Tiempo transcurrido: {elapsed_time:.2f} horas")
 
