@@ -26,7 +26,7 @@ train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
 #valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
 
 
-#image_ids_train = train_data['image'].tolist()
+image_ids_train = train_data['image'].tolist()
 #image_ids_test = test_data['image'].tolist()
 #image_ids_valid = valid_data['image'].tolist()
 
@@ -38,10 +38,11 @@ path_train = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_In
 
 
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
+    transforms.Resize((32, 32)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
     transforms.ToTensor(),
     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))  # Normalización de los valores de los píxeles
 ])
+
 
 class CustomDataset(torch.utils.data.Dataset):
     def __init__(self, data, transform=None):
@@ -59,6 +60,7 @@ class CustomDataset(torch.utils.data.Dataset):
             image = self.transform(image)
         label = self.data['final_label'].iloc[index]
         return image, label
+
 
 train_dataset = CustomDataset(train_data, transform=transform)
 #test_dataset = CustomDataset(test_data, transform=transform)

@@ -23,7 +23,7 @@ train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
 # ... Código para cargar las rutas de las imágenes y crear los conjuntos de datos ...
 
 transform = transforms.Compose([
-    transforms.Resize((224, 224)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
+    transforms.Resize((32, 32)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
     transforms.ToTensor(),
     transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))  # Normalización de los valores de los píxeles
 ])
@@ -52,7 +52,7 @@ train_dataset = CustomDataset(train_data, transform=transform)
 #valid_dataset = CustomDataset(valid_data, transform=transform)
 
 # ... Código para crear los data loaders ...
-batch_train = 10
+batch_train = 196
 
 train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
 
