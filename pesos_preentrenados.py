@@ -95,19 +95,22 @@ def train(model, train_loader, criterion, optimizer):
         train_labels.extend(labels.cpu().numpy())
 
     train_loss /= total_samples
+    t_loss = train_loss/len(train_loader)
+    acc = 100 * correct_predictions/total_samples
     accuracy = accuracy_score(train_labels, train_predictions)
 
-    return accuracy, train_predictions, train_labels, train_loss
+    return acc, accuracy,train_predictions, train_labels, train_loss, t_loss
 
 num_epochs = 10
 for epoch in range(num_epochs):
-    train_accuracy, train_predictions, train_labels, train_loss = train(model, train_loader, criterion, optimizer)
+    acc_manual, train_accuracy, train_predictions, train_labels, train_loss, t_loss_manual = train(model, train_loader, criterion, optimizer)
 
     train_precision = precision_score(train_labels, train_predictions, average=None)
     train_recall = recall_score(train_labels, train_predictions, average=None)
     train_f1_score = f1_score(train_labels, train_predictions, average=None)
 
     print(f'Training Loss: {train_loss:.4f} | Training Accuracy: {train_accuracy:.2f}%')
+    print(f'Training Loss manual: {t_loss_manual:.4f} | Training Accuracy manual: {acc_manual:.2f}%')
     print(f'Training Precision: {train_precision}')
     print(f'Training Recall: {train_recall}')
     print(f'Training F1-Score: {train_f1_score}')
