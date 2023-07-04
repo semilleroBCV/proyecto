@@ -26,6 +26,10 @@ train_dataset = CustomDataset(train_data, transform=transform)
 #valid_dataset = CustomDataset(valid_data, transform=transform)
 
 # ... Código para crear los data loaders ...
+batch_train = 10
+
+train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
+
 
 # Cargar el modelo pre-entrenado ResNet
 model = models.resnet18(pretrained=True)
