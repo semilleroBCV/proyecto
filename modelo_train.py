@@ -11,6 +11,7 @@ import time
 import os
 import numpy as np
 import pickle
+from PIL import Image
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
