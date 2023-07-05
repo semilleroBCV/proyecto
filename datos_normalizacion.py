@@ -16,7 +16,6 @@ from PIL import Image
 
 print(torch.cuda.is_available())
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-breakpoint()
 start_time = time.time()
 #print(torch.cuda.is_available())
 
@@ -62,6 +61,7 @@ channel_means = []
 channel_stds = []
        
 for image, _ in train_loader:
+    image = image.to(device)
     # Reorganizar el tensor de imágenes
     image = image.view(3, -1)
     # Calcular la media y desviación estándar por canal

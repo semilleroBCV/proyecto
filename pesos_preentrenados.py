@@ -5,8 +5,6 @@ import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import pandas as pd
-from skimage import io
-from skimage.transform import resize
 from PIL import Image
 import time
 from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
@@ -17,15 +15,15 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Carga de datos y preprocesamiento
 train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
-#test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
-#valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
+test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
+valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
 
 # ... Código para cargar las rutas de las imágenes y crear los conjuntos de datos ...
 
 transform = transforms.Compose([
     transforms.Resize((32, 32)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
     transforms.ToTensor(),
-    transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))  # Normalización de los valores de los píxeles
+    transforms.Normalize((0.5558, 0.5982, 0.6149), (0.2433, 0.1914, 0.1902))  # Normalización de los valores de los píxeles
 ])
 
 
@@ -48,20 +46,23 @@ class CustomDataset(torch.utils.data.Dataset):
 
 
 train_dataset = CustomDataset(train_data, transform=transform)
-#test_dataset = CustomDataset(test_data, transform=transform)
-#valid_dataset = CustomDataset(valid_data, transform=transform)
+test_dataset = CustomDataset(test_data, transform=transform)
+valid_dataset = CustomDataset(valid_data, transform=transform)
 
 # ... Código para crear los data loaders ...
 batch_train = 196
+batch_test = 196
+batch_valid = 196
 
 train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
-
+test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
+valid_loader = DataLoader(valid_dataset, batch_size=batch_valid, shuffle=False)
 
 # Cargar el modelo pre-entrenado ResNet
 model = models.resnet18(pretrained=True)
 num_ftrs = model.fc.in_features
 
-# Reemplazar la capa completamente conectada para ajustarse al número de clases en tu problema
+# Reemplazar la capa completamente conectada para ajustarse al número de clases a 9
 model.fc = nn.Linear(num_ftrs, 9)
 
 model = model.to(device)
@@ -70,6 +71,8 @@ model = model.to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
+
+#Entrenamiento 
 def train(model, train_loader, criterion, optimizer):
     model.train()
     train_loss = 0.0
@@ -94,32 +97,86 @@ def train(model, train_loader, criterion, optimizer):
         train_predictions.extend(predicted.cpu().numpy())
         train_labels.extend(labels.cpu().numpy())
 
-    train_loss /= total_samples
     t_loss = train_loss/len(train_loader)
     acc = 100 * correct_predictions/total_samples
-    accuracy = accuracy_score(train_labels, train_predictions)
+    
+    return train_predictions, train_labels, t_loss, acc
 
-    return acc, accuracy,train_predictions, train_labels, train_loss, t_loss
+#Validación y test 
+def evaluate(model, data_loader, criterion):
+    model.eval()
+    loss = 0.0
+    correct_predictions = 0
+    total_samples = 0
+    predictions = []
+    labels = []
+
+    with torch.no_grad():
+        for images, labels_batch in data_loader:
+            images, labels_batch = images.to(device), labels_batch.to(device)
+            outputs = model(images)
+            batch_loss = criterion(outputs, labels_batch)
+
+            loss += batch_loss.item() * images.size(0)
+            _, predicted = torch.max(outputs, 1)
+            correct_predictions += (predicted == labels_batch).sum().item()
+            total_samples += labels_batch.size(0)
+
+            predictions.extend(predicted.cpu().numpy())
+            labels.extend(labels_batch.cpu().numpy())
+
+    avg_loss = loss / len(data_loader)
+    accuracy = 100 * correct_predictions / total_samples
+
+    return predictions, labels, avg_loss, accuracy
+
+
+
 
 num_epochs = 10
 for epoch in range(num_epochs):
-    acc_manual, train_accuracy, train_predictions, train_labels, train_loss, t_loss_manual = train(model, train_loader, criterion, optimizer)
-
+    #impresión train
+    train_predictions, train_labels, t_loss, acc = train(model, train_loader, criterion, optimizer)
     train_precision = precision_score(train_labels, train_predictions, average=None)
     train_recall = recall_score(train_labels, train_predictions, average=None)
     train_f1_score = f1_score(train_labels, train_predictions, average=None)
 
-    print(f'Training Loss: {train_loss:.4f} | Training Accuracy: {train_accuracy:.2f}%')
-    print(f'Training Loss manual: {t_loss_manual:.4f} | Training Accuracy manual: {acc_manual:.2f}%')
+    print(f'Época: {epoch:.4f}')
+    print(f'Training Loss: {t_loss:.4f} | Training Accuracy: {acc:.2f}%')
     print(f'Training Precision: {train_precision}')
     print(f'Training Recall: {train_recall}')
     print(f'Training F1-Score: {train_f1_score}')
     print('---------------------------')
 
-# ... Código adicional para evaluar el modelo en el conjunto de validación o prueba ...
+    #Validación
+    valid_predictions, valid_labels, v_loss, v_acc = evaluate(model, valid_loader, criterion)  
+    valid_precision = precision_score(valid_labels, valid_predictions, average=None)
+    valid_recall = recall_score(valid_labels, valid_predictions, average=None)
+    valid_f1_score = f1_score(valid_labels, valid_predictions, average=None)
+
+    print('---------- Validación ----------')
+    print(f'Validation Loss: {v_loss:.4f} | Validation Accuracy: {v_acc:.2f}%')
+    print(f'Validation Precision: {valid_precision}')
+    print(f'Validation Recall: {valid_recall}')
+    print(f'Validation F1-Score: {valid_f1_score}')
+    print('-------------------------------')
+    
+    # Evaluación en el conjunto de prueba
+    test_predictions, test_labels, t_loss, t_acc = evaluate(model, test_loader, criterion)
+
+    test_precision = precision_score(test_labels, test_predictions, average=None)
+    test_recall = recall_score(test_labels, test_predictions, average=None)
+    test_f1_score = f1_score(test_labels, test_predictions, average=None)
+
+    print('---------- Prueba ----------')
+    print(f'Test Loss: {t_loss:.4f} | Test Accuracy: {t_acc:.2f}%')
+    print(f'Test Precision: {test_precision}')
+    print(f'Test Recall: {test_recall}')
+    print(f'Test F1-Score: {test_f1_score}')
+    print('----------------------------')
 
 end_time = time.time()
 
 # Cálculo del tiempo transcurrido
-elapsed_time = end_time - start_time
-print(f"Tiempo transcurrido: {elapsed_time} segundos")
+elapsed_time = (end_time - start_time)/60
+print(f"Tiempo transcurrido: {elapsed_time} minutos")
