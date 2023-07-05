@@ -1,48 +1,29 @@
 import torch
-import pandas as pd
-from skimage import io
 import torch.nn as nn
 import torch.optim as optim
+import torchvision.models as models
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
-from skimage.transform import resize
-from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
-import time
-import os
-import numpy as np
-import pickle
+import pandas as pd
 from PIL import Image
+import time
+from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 start_time = time.time()
-#print(torch.cuda.is_available())
-
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 #Carga de datos
 train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
-#test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
-#valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
-
-
-image_ids_train = train_data['image'].tolist()
-#image_ids_test = test_data['image'].tolist()
-#image_ids_valid = valid_data['image'].tolist()
-
-
-path_train = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_Input/{image_id}.jpg" for image_id in image_ids_train]
-#path_test = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Test_Input/{image_id}.jpg" for image_id in image_ids_test]
-#path_valid = [f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Valid_Input/{image_id}.jpg" for image_id in image_ids_valid]
-#target_size = (782, 647)  # Tamaño objetivo de las imágenes
-
+test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
+valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
 
 transform = transforms.Compose([
     transforms.Resize((32, 32)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
     transforms.ToTensor(),
-    transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))  # Normalización de los valores de los píxeles
+    transforms.Normalize((0.5558, 0.5982, 0.6149), (0.2433, 0.1914, 0.1902))  # Normalización de los valores de los píxeles
 ])
-
 
 class CustomDataset(torch.utils.data.Dataset):
     def __init__(self, data, transform=None):
@@ -63,18 +44,17 @@ class CustomDataset(torch.utils.data.Dataset):
 
 
 train_dataset = CustomDataset(train_data, transform=transform)
-#test_dataset = CustomDataset(test_data, transform=transform)
-#valid_dataset = CustomDataset(valid_data, transform=transform)
+test_dataset = CustomDataset(test_data, transform=transform)
+valid_dataset = CustomDataset(valid_data, transform=transform)
 
+# ... Código para crear los data loaders ... AJUSTAR BATCH
 batch_train = 196
-#batch_test = 10
-#batch_valid = 10
+batch_test = 196
+batch_valid = 196
 
 train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
-#valid_loader = DataLoader(valid_dataset, batch_size=batch_valid, shuffle=False)
-#test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
-
-#print(train_loader)
+test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
+valid_loader = DataLoader(valid_dataset, batch_size=batch_valid, shuffle=False)
 
 #Modelo 
 class CNN(nn.Module):
@@ -129,58 +109,110 @@ model = CNN().to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
+#Entrenamiento 
 def train(model, train_loader, criterion, optimizer):
     model.train()
-    train_loss = 0.0 
-    correct_predictions = 0 
+    train_loss = 0.0
+    correct_predictions = 0
     total_samples = 0
     train_predictions = []
     train_labels = []
-    
-    
+
     for images, labels in train_loader:
-        images, labels = images.to(device).float(), labels.to(device)
+        images, labels = images.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
-        
+
         train_loss += loss.item() * images.size(0)
         _, predicted = torch.max(outputs, 1)
         correct_predictions += (predicted == labels).sum().item()
         total_samples += labels.size(0)
-        
+
         train_predictions.extend(predicted.cpu().numpy())
         train_labels.extend(labels.cpu().numpy())
 
-    train_loss /= total_samples
     t_loss = train_loss/len(train_loader)
     acc = 100 * correct_predictions/total_samples
-    accuracy = accuracy_score(train_labels, train_predictions)
+    
+    return train_predictions, train_labels, t_loss, acc
 
-    return acc, accuracy,train_predictions, train_labels, train_loss, t_loss
+
+#Validación y test 
+def evaluate(model, data_loader, criterion):
+    model.eval()
+    loss = 0.0
+    correct_predictions = 0
+    total_samples = 0
+    predictions = []
+    labels = []
+
+    with torch.no_grad():
+        for images, labels_batch in data_loader:
+            images, labels_batch = images.to(device), labels_batch.to(device)
+            outputs = model(images)
+            batch_loss = criterion(outputs, labels_batch)
+
+            loss += batch_loss.item() * images.size(0)
+            _, predicted = torch.max(outputs, 1)
+            correct_predictions += (predicted == labels_batch).sum().item()
+            total_samples += labels_batch.size(0)
+
+            predictions.extend(predicted.cpu().numpy())
+            labels.extend(labels_batch.cpu().numpy())
+
+    avg_loss = loss / len(data_loader)
+    accuracy = 100 * correct_predictions / total_samples
+
+    return predictions, labels, avg_loss, accuracy
 
  
 num_epochs = 10
 for epoch in range(num_epochs):
-    acc_manual, train_accuracy, train_predictions, train_labels, train_loss, t_loss_manual = train(model, train_loader, criterion, optimizer)
-
+    #impresión train
+    train_predictions, train_labels, t_loss, acc = train(model, train_loader, criterion, optimizer)
     train_precision = precision_score(train_labels, train_predictions, average=None)
     train_recall = recall_score(train_labels, train_predictions, average=None)
     train_f1_score = f1_score(train_labels, train_predictions, average=None)
 
-    print(f'Training Loss: {train_loss:.4f} | Training Accuracy: {train_accuracy:.2f}%')
-    print(f'Training Loss manual: {t_loss_manual:.4f} | Training Accuracy manual: {acc_manual:.2f}%')
+    print(f'Época: {epoch:.4f}')
+    print(f'Training Loss: {t_loss:.4f} | Training Accuracy: {acc:.2f}%')
     print(f'Training Precision: {train_precision}')
     print(f'Training Recall: {train_recall}')
     print(f'Training F1-Score: {train_f1_score}')
     print('---------------------------')
 
+    #Validación
+    valid_predictions, valid_labels, v_loss, v_acc = evaluate(model, valid_loader, criterion)  
+    valid_precision = precision_score(valid_labels, valid_predictions, average=None)
+    valid_recall = recall_score(valid_labels, valid_predictions, average=None)
+    valid_f1_score = f1_score(valid_labels, valid_predictions, average=None)
 
+    print('---------- Validación ----------')
+    print(f'Validation Loss: {v_loss:.4f} | Validation Accuracy: {v_acc:.2f}%')
+    print(f'Validation Precision: {valid_precision}')
+    print(f'Validation Recall: {valid_recall}')
+    print(f'Validation F1-Score: {valid_f1_score}')
+    print('-------------------------------')
+    
+    # Evaluación en el conjunto de prueba
+    test_predictions, test_labels, t_loss, t_acc = evaluate(model, test_loader, criterion)
+    test_precision = precision_score(test_labels, test_predictions, average=None)
+    test_recall = recall_score(test_labels, test_predictions, average=None)
+    test_f1_score = f1_score(test_labels, test_predictions, average=None)
+
+    print('---------- Prueba ----------')
+    print(f'Test Loss: {t_loss:.4f} | Test Accuracy: {t_acc:.2f}%')
+    print(f'Test Precision: {test_precision}')
+    print(f'Test Recall: {test_recall}')
+    print(f'Test F1-Score: {test_f1_score}')
+    print('----------------------------')
+    
 end_time = time.time()
 
 # Cálculo del tiempo transcurrido en horas
-elapsed_time = (end_time - start_time) / 3600
-print(f"Tiempo transcurrido: {elapsed_time:.2f} horas")
+elapsed_time = (end_time - start_time) / 60
+print(f"Tiempo transcurrido: {elapsed_time:.2f} minutos")
 

@@ -19,7 +19,7 @@ test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
 valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
 
 transform = transforms.Compose([
-    transforms.Resize((32, 32)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
+    transforms.Resize((299, 299)),  
     transforms.ToTensor(),
     transforms.Normalize((0.5558, 0.5982, 0.6149), (0.2433, 0.1914, 0.1902))  # Normalización de los valores de los píxeles
 ])
@@ -57,7 +57,7 @@ test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
 valid_loader = DataLoader(valid_dataset, batch_size=batch_valid, shuffle=False)
 
 # Cargar el modelo pre-entrenado ResNet
-model = models.resnet18(pretrained=True)
+model = models.inception_v3(pretrained=True)
 num_ftrs = model.fc.in_features
 
 # Reemplazar la capa completamente conectada para ajustarse al número de clases a 9
