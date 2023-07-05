@@ -18,8 +18,6 @@ train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
 test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
 valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
 
-# ... Código para cargar las rutas de las imágenes y crear los conjuntos de datos ...
-
 transform = transforms.Compose([
     transforms.Resize((32, 32)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
     transforms.ToTensor(),
@@ -49,7 +47,7 @@ train_dataset = CustomDataset(train_data, transform=transform)
 test_dataset = CustomDataset(test_data, transform=transform)
 valid_dataset = CustomDataset(valid_data, transform=transform)
 
-# ... Código para crear los data loaders ...
+# ... Código para crear los data loaders ... AJUSTAR BATCH
 batch_train = 196
 batch_test = 196
 batch_valid = 196
