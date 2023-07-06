@@ -194,9 +194,11 @@ for epoch in range(num_epochs):
     print('----------------------------')
 
 
-# Llamar a la función evaluate y obtener las imágenes de muestra
+# Directorio para guardar las imágenes
+save_dir = '/media/disk2/apenaranda/Semillero/proyecto'  # Reemplaza con el directorio donde deseas guardar las imágenes
+os.makedirs(save_dir, exist_ok=True)
 
-# Recorrer las imágenes de muestra y mostrarlas
+# Recorrer las imágenes de muestra y guardarlas en el directorio
 for i in range(len(test_images)):
     image = test_images[i].permute(1, 2, 0)
     label_true = test_label_true[i]
@@ -205,10 +207,13 @@ for i in range(len(test_images)):
     # Convertir la imagen a un objeto de la clase Image de PIL
     image_pil = Image.fromarray((image * 255).numpy().astype(np.uint8))
 
-    # Mostrar la imagen con etiquetas verdaderas y predichas
-    image_pil.show()
-    print(f'True: {label_true}\nPredicted: {label_pred}')
+    # Ruta de archivo para guardar la imagen
+    file_path = os.path.join(save_dir, f'image_{i}.jpg')
 
+    # Guardar la imagen con etiquetas verdaderas y predichas
+    image_pil.save(file_path)
+
+    print(f'True: {label_true}\nPredicted: {label_pred}')
 end_time = time.time()
 
 # Cálculo del tiempo transcurrido

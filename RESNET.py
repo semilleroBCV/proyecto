@@ -140,27 +140,11 @@ def evaluate(model, data_loader, criterion):
     sample_labels_true = np.array(sample_labels_true)
     sample_labels_pred = np.array(sample_labels_pred)
 
-    # Visualización de las imágenes de muestra con etiquetas verdaderas y predichas
-    fig, axs = plt.subplots(4, 4, figsize=(10, 10))
-    fig.suptitle('Evaluación Cualitativa del Modelo')
-
-    
-    for i, ax in enumerate(axs.flatten()):
-        image = sample_images[i].permute(1, 2, 0)
-        label_true = sample_labels_true[i]
-        label_pred = sample_labels_pred[i]
-
-        ax.imshow(image)
-        ax.set_title(f'True: {label_true}\nPredicted: {label_pred}')
-        ax.axis('off')
-
-    plt.tight_layout()
-    plt.show()
 
     avg_loss = loss / len(data_loader)
     accuracy = 100 * correct_predictions / total_samples
 
-    return predictions, labels, avg_loss, accuracy
+    return predictions, labels, avg_loss, accuracy, sample_images, sample_labels_pred, sample_labels_true
 
 
 num_epochs = 10
@@ -179,7 +163,7 @@ for epoch in range(num_epochs):
     print('---------------------------')
 
     #Validación
-    valid_predictions, valid_labels, v_loss, v_acc = evaluate(model, valid_loader, criterion)  
+    valid_predictions, valid_labels, v_loss, v_acc, valid_images, valid_label_true, valid_label_pred = evaluate(model, valid_loader, criterion)  
     valid_precision = precision_score(valid_labels, valid_predictions, average=None)
     valid_recall = recall_score(valid_labels, valid_predictions, average=None)
     valid_f1_score = f1_score(valid_labels, valid_predictions, average=None)
@@ -192,7 +176,7 @@ for epoch in range(num_epochs):
     print('-------------------------------')
     
     # Evaluación en el conjunto de prueba
-    test_predictions, test_labels, t_loss, t_acc = evaluate(model, test_loader, criterion)
+    test_predictions, test_labels, t_loss, t_acc, test_images, test_label_true, test_label_pred = evaluate(model, test_loader, criterion)
 
     test_precision = precision_score(test_labels, test_predictions, average=None)
     test_recall = recall_score(test_labels, test_predictions, average=None)
@@ -205,6 +189,27 @@ for epoch in range(num_epochs):
     print(f'Test F1-Score: {test_f1_score}')
     print('----------------------------')
 
+# Directorio para guardar las imágenes
+save_dir = '/media/disk2/apenaranda/Semillero/proyecto'  # Reemplaza con el directorio donde deseas guardar las imágenes
+os.makedirs(save_dir, exist_ok=True)
+
+# Recorrer las imágenes de muestra y guardarlas en el directorio
+for i in range(len(test_images)):
+    image = test_images[i].permute(1, 2, 0)
+    label_true = test_label_true[i]
+    label_pred = test_label_pred[i]
+
+    # Convertir la imagen a un objeto de la clase Image de PIL
+    image_pil = Image.fromarray((image * 255).numpy().astype(np.uint8))
+
+    # Ruta de archivo para guardar la imagen
+    file_path = os.path.join(save_dir, f'image_{i}.jpg')
+
+    # Guardar la imagen con etiquetas verdaderas y predichas
+    image_pil.save(file_path)
+
+    print(f'True: {label_true}\nPredicted: {label_pred}')
+    
 end_time = time.time()
 
 # Cálculo del tiempo transcurrido
