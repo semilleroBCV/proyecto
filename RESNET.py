@@ -8,7 +8,11 @@ import pandas as pd
 from PIL import Image
 import time
 from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
+import matplotlib.pyplot as plt
+import os
+import numpy as np
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 start_time = time.time()
 # Especificar el dispositivo a utilizar (GPU o CPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -19,7 +23,7 @@ test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
 valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
 
 transform = transforms.Compose([
-    transforms.Resize((32, 32)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
+    transforms.Resize((224, 224)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
     transforms.ToTensor(),
     transforms.Normalize((0.5558, 0.5982, 0.6149), (0.2433, 0.1914, 0.1902))  # Normalización de los valores de los píxeles
 ])
@@ -48,9 +52,9 @@ test_dataset = CustomDataset(test_data, transform=transform)
 valid_dataset = CustomDataset(valid_data, transform=transform)
 
 # ... Código para crear los data loaders ... AJUSTAR BATCH
-batch_train = 196
-batch_test = 196
-batch_valid = 196
+batch_train = 443
+batch_test = 95
+batch_valid = 95
 
 train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
@@ -108,6 +112,9 @@ def evaluate(model, data_loader, criterion):
     total_samples = 0
     predictions = []
     labels = []
+    sample_images = []
+    sample_labels_true = []
+    sample_labels_pred = []
 
     with torch.no_grad():
         for images, labels_batch in data_loader:
@@ -122,6 +129,33 @@ def evaluate(model, data_loader, criterion):
 
             predictions.extend(predicted.cpu().numpy())
             labels.extend(labels_batch.cpu().numpy())
+
+            if len(sample_images) < 16:  # Guardar las primeras 16 imágenes
+                sample_images.extend(images.cpu())
+                sample_labels_true.extend(labels_batch.cpu().numpy())
+                sample_labels_pred.extend(predicted.cpu().numpy())
+
+    
+    sample_images = torch.stack(sample_images)
+    sample_labels_true = np.array(sample_labels_true)
+    sample_labels_pred = np.array(sample_labels_pred)
+
+    # Visualización de las imágenes de muestra con etiquetas verdaderas y predichas
+    fig, axs = plt.subplots(4, 4, figsize=(10, 10))
+    fig.suptitle('Evaluación Cualitativa del Modelo')
+
+    
+    for i, ax in enumerate(axs.flatten()):
+        image = sample_images[i].permute(1, 2, 0)
+        label_true = sample_labels_true[i]
+        label_pred = sample_labels_pred[i]
+
+        ax.imshow(image)
+        ax.set_title(f'True: {label_true}\nPredicted: {label_pred}')
+        ax.axis('off')
+
+    plt.tight_layout()
+    plt.show()
 
     avg_loss = loss / len(data_loader)
     accuracy = 100 * correct_predictions / total_samples

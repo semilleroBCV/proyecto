@@ -8,6 +8,9 @@ import pandas as pd
 from PIL import Image
 import time
 from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
+import matplotlib.pyplot as plt
+import os
+import numpy as np
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -48,9 +51,9 @@ test_dataset = CustomDataset(test_data, transform=transform)
 valid_dataset = CustomDataset(valid_data, transform=transform)
 
 # ... Código para crear los data loaders ... AJUSTAR BATCH
-batch_train = 196
-batch_test = 196
-batch_valid = 196
+batch_train = 1773
+batch_test = 380
+batch_valid = 380
 
 train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)

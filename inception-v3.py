@@ -6,8 +6,13 @@ import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
 import pandas as pd
 from PIL import Image
+import os
+import numpy as np
+from torchvision.models.inception import InceptionOutputs
 import time
 from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
+import matplotlib.pyplot as plt
+
 
 start_time = time.time()
 # Especificar el dispositivo a utilizar (GPU o CPU)
@@ -48,9 +53,9 @@ test_dataset = CustomDataset(test_data, transform=transform)
 valid_dataset = CustomDataset(valid_data, transform=transform)
 
 # ... Código para crear los data loaders ... AJUSTAR BATCH
-batch_train = 196
-batch_test = 196
-batch_valid = 196
+batch_train = 111
+batch_test = 24
+batch_valid = 23
 
 train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
@@ -83,6 +88,8 @@ def train(model, train_loader, criterion, optimizer):
         images, labels = images.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(images)
+        if isinstance(outputs, InceptionOutputs):
+            outputs = outputs.logits
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
@@ -108,11 +115,16 @@ def evaluate(model, data_loader, criterion):
     total_samples = 0
     predictions = []
     labels = []
+    sample_images = []
+    sample_labels_true = []
+    sample_labels_pred = []
 
     with torch.no_grad():
         for images, labels_batch in data_loader:
             images, labels_batch = images.to(device), labels_batch.to(device)
             outputs = model(images)
+            if isinstance(outputs, InceptionOutputs):
+                outputs = outputs.logits
             batch_loss = criterion(outputs, labels_batch)
 
             loss += batch_loss.item() * images.size(0)
@@ -123,10 +135,20 @@ def evaluate(model, data_loader, criterion):
             predictions.extend(predicted.cpu().numpy())
             labels.extend(labels_batch.cpu().numpy())
 
+            if len(sample_images) < 10:  # Guardar las primeras 16 imágenes
+                sample_images.extend(images.cpu())
+                sample_labels_true.extend(labels_batch.cpu().numpy())
+                sample_labels_pred.extend(predicted.cpu().numpy())
+
+
     avg_loss = loss / len(data_loader)
     accuracy = 100 * correct_predictions / total_samples
 
-    return predictions, labels, avg_loss, accuracy
+    sample_images = torch.stack(sample_images)
+    sample_labels_true = np.array(sample_labels_true)
+    sample_labels_pred = np.array(sample_labels_pred)
+
+    return predictions, labels, avg_loss, accuracy, sample_images, sample_labels_true, sample_labels_pred
 
 
 num_epochs = 10
@@ -145,7 +167,7 @@ for epoch in range(num_epochs):
     print('---------------------------')
 
     #Validación
-    valid_predictions, valid_labels, v_loss, v_acc = evaluate(model, valid_loader, criterion)  
+    valid_predictions, valid_labels, v_loss, v_acc, valid_images, valid_label_true, valid_label_pred= evaluate(model, valid_loader, criterion)  
     valid_precision = precision_score(valid_labels, valid_predictions, average=None)
     valid_recall = recall_score(valid_labels, valid_predictions, average=None)
     valid_f1_score = f1_score(valid_labels, valid_predictions, average=None)
@@ -158,7 +180,7 @@ for epoch in range(num_epochs):
     print('-------------------------------')
     
     # Evaluación en el conjunto de prueba
-    test_predictions, test_labels, t_loss, t_acc = evaluate(model, test_loader, criterion)
+    test_predictions, test_labels, t_loss, t_acc, test_images, test_label_true, test_label_pred = evaluate(model, test_loader, criterion)
 
     test_precision = precision_score(test_labels, test_predictions, average=None)
     test_recall = recall_score(test_labels, test_predictions, average=None)
@@ -171,8 +193,25 @@ for epoch in range(num_epochs):
     print(f'Test F1-Score: {test_f1_score}')
     print('----------------------------')
 
+
+# Llamar a la función evaluate y obtener las imágenes de muestra
+
+# Recorrer las imágenes de muestra y mostrarlas
+for i in range(len(test_images)):
+    image = test_images[i].permute(1, 2, 0)
+    label_true = test_label_true[i]
+    label_pred = test_label_pred[i]
+
+    # Convertir la imagen a un objeto de la clase Image de PIL
+    image_pil = Image.fromarray((image * 255).numpy().astype(np.uint8))
+
+    # Mostrar la imagen con etiquetas verdaderas y predichas
+    image_pil.show()
+    print(f'True: {label_true}\nPredicted: {label_pred}')
+
 end_time = time.time()
 
 # Cálculo del tiempo transcurrido
 elapsed_time = (end_time - start_time)/60
 print(f"Tiempo transcurrido: {elapsed_time} minutos")
+
