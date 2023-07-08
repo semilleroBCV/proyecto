@@ -8,10 +8,10 @@ import pandas as pd
 from PIL import Image
 import time
 from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 import os
 import numpy as np
-
+import torch.nn.functional as F
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 start_time = time.time()
@@ -40,10 +40,10 @@ class CustomDataset(torch.utils.data.Dataset):
         image_id = self.data['image'].iloc[index]
         image_path = f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_Input/{image_id}.jpg"
         image = Image.open(image_path)
+        label = self.data['final_label'].iloc[index]
         if self.transform:
             image = self.transform(image)
-        label = self.data['final_label'].iloc[index]
-        return image, label
+        return image, label, image_id
 
 
 train_dataset = CustomDataset(train_data, transform=transform)
@@ -51,13 +51,20 @@ test_dataset = CustomDataset(test_data, transform=transform)
 valid_dataset = CustomDataset(valid_data, transform=transform)
 
 # ... Código para crear los data loaders ... AJUSTAR BATCH
-batch_train = 1773
+batch_train = 1
 batch_test = 380
 batch_valid = 380
 
 train_loader = DataLoader(train_dataset, batch_size=batch_train, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=batch_test, shuffle=False)
 valid_loader = DataLoader(valid_dataset, batch_size=batch_valid, shuffle=False)
+
+"""
+for image, label, image_id in train_loader:
+    #print("Imagen : ", image)
+    print("longitud Label : ", len(label))
+    print("Id : ", len(image_id))"""
+    
 
 #Modelo 
 class CNN(nn.Module):
@@ -78,7 +85,7 @@ class CNN(nn.Module):
         self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1)
         self.relu3 = nn.ReLU()
         self.pool3 = nn.MaxPool2d(kernel_size=2)
-        
+        self.conv3_drop = nn.Dropout2d()
         # Capa completamente conectada: entrada 128*4*4 unidades, salida 9 unidades (número de clases)
         self.fc = nn.Linear(128 * 4 * 4, 9)
     
@@ -100,6 +107,7 @@ class CNN(nn.Module):
         
         # Aplanar los mapas de características
         x = x.view(x.size(0), -1)
+        x = F.dropout(x, training=self.training)
         
         # Capa completamente conectada
         x = self.fc(x)
@@ -120,28 +128,23 @@ def train(model, train_loader, criterion, optimizer):
     total_samples = 0
     train_predictions = []
     train_labels = []
-
-    for images, labels in train_loader:
-        images, labels = images.to(device), labels.to(device)
+    for images, labels, _ in train_loader:
+        images, labels, _ = images.to(device), labels.to(device), _
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
         loss.backward()
         optimizer.step()
-
         train_loss += loss.item() * images.size(0)
         _, predicted = torch.max(outputs, 1)
         correct_predictions += (predicted == labels).sum().item()
         total_samples += labels.size(0)
-
+        print(total_samples)
         train_predictions.extend(predicted.cpu().numpy())
         train_labels.extend(labels.cpu().numpy())
-
     t_loss = train_loss/len(train_loader)
     acc = 100 * correct_predictions/total_samples
-    
     return train_predictions, train_labels, t_loss, acc
-
 
 #Validación y test 
 def evaluate(model, data_loader, criterion):
@@ -151,24 +154,19 @@ def evaluate(model, data_loader, criterion):
     total_samples = 0
     predictions = []
     labels = []
-
     with torch.no_grad():
         for images, labels_batch in data_loader:
             images, labels_batch = images.to(device), labels_batch.to(device)
             outputs = model(images)
             batch_loss = criterion(outputs, labels_batch)
-
             loss += batch_loss.item() * images.size(0)
             _, predicted = torch.max(outputs, 1)
             correct_predictions += (predicted == labels_batch).sum().item()
             total_samples += labels_batch.size(0)
-
             predictions.extend(predicted.cpu().numpy())
             labels.extend(labels_batch.cpu().numpy())
-
     avg_loss = loss / len(data_loader)
     accuracy = 100 * correct_predictions / total_samples
-
     return predictions, labels, avg_loss, accuracy
 
  
@@ -218,4 +216,3 @@ end_time = time.time()
 # Cálculo del tiempo transcurrido en horas
 elapsed_time = (end_time - start_time) / 60
 print(f"Tiempo transcurrido: {elapsed_time:.2f} minutos")
-
