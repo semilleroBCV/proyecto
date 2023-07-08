@@ -9,18 +9,17 @@ from PIL import Image
 import time
 from sklearn.metrics import precision_score, recall_score, accuracy_score, f1_score
 import matplotlib.pyplot as plt
-import os
 import numpy as np
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 start_time = time.time()
 # Especificar el dispositivo a utilizar (GPU o CPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Carga de datos y preprocesamiento
-train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
-test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
-valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
+train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_Binary.csv')
+test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_Binary.csv')
+valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_Binary.csv')
 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
@@ -41,10 +40,10 @@ class CustomDataset(torch.utils.data.Dataset):
         image_id = self.data['image'].iloc[index]
         image_path = f"/home/nmercado/data_proyecto/data_proyecto/ISIC_2019_Training_Input/{image_id}.jpg"
         image = Image.open(image_path)
+        label = self.data['final_label'].iloc[index]
         if self.transform:
             image = self.transform(image)
-        label = self.data['final_label'].iloc[index]
-        return image, label
+        return image, label, image_id
 
 
 train_dataset = CustomDataset(train_data, transform=transform)
@@ -63,10 +62,8 @@ valid_loader = DataLoader(valid_dataset, batch_size=batch_valid, shuffle=False)
 # Cargar el modelo pre-entrenado ResNet
 model = models.resnet18(pretrained=True)
 num_ftrs = model.fc.in_features
-
 # Reemplazar la capa completamente conectada para ajustarse al número de clases a 9
 model.fc = nn.Linear(num_ftrs, 9)
-
 model = model.to(device)
 
 # Definir la función de pérdida y el optimizador
@@ -121,15 +118,13 @@ def evaluate(model, data_loader, criterion):
             images, labels_batch = images.to(device), labels_batch.to(device)
             outputs = model(images)
             batch_loss = criterion(outputs, labels_batch)
-
             loss += batch_loss.item() * images.size(0)
             _, predicted = torch.max(outputs, 1)
             correct_predictions += (predicted == labels_batch).sum().item()
             total_samples += labels_batch.size(0)
-
             predictions.extend(predicted.cpu().numpy())
             labels.extend(labels_batch.cpu().numpy())
-
+            """
             if len(sample_images) < 16:  # Guardar las primeras 16 imágenes
                 sample_images.extend(images.cpu())
                 sample_labels_true.extend(labels_batch.cpu().numpy())
@@ -138,13 +133,10 @@ def evaluate(model, data_loader, criterion):
     
     sample_images = torch.stack(sample_images)
     sample_labels_true = np.array(sample_labels_true)
-    sample_labels_pred = np.array(sample_labels_pred)
-
-
+    sample_labels_pred = np.array(sample_labels_pred)"""
     avg_loss = loss / len(data_loader)
     accuracy = 100 * correct_predictions / total_samples
-
-    return predictions, labels, avg_loss, accuracy, sample_images, sample_labels_pred, sample_labels_true
+    return predictions, labels, avg_loss, accuracy #, sample_images, sample_labels_pred, sample_labels_true
 
 
 num_epochs = 10
@@ -163,7 +155,7 @@ for epoch in range(num_epochs):
     print('---------------------------')
 
     #Validación
-    valid_predictions, valid_labels, v_loss, v_acc, valid_images, valid_label_true, valid_label_pred = evaluate(model, valid_loader, criterion)  
+    valid_predictions, valid_labels, v_loss, v_acc = evaluate(model, valid_loader, criterion) #,valid_images, valid_label_true, valid_label_pred = evaluate(model, valid_loader, criterion)  
     valid_precision = precision_score(valid_labels, valid_predictions, average=None)
     valid_recall = recall_score(valid_labels, valid_predictions, average=None)
     valid_f1_score = f1_score(valid_labels, valid_predictions, average=None)
@@ -176,8 +168,7 @@ for epoch in range(num_epochs):
     print('-------------------------------')
     
     # Evaluación en el conjunto de prueba
-    test_predictions, test_labels, t_loss, t_acc, test_images, test_label_true, test_label_pred = evaluate(model, test_loader, criterion)
-
+    test_predictions, test_labels, t_loss, t_acc = evaluate(model, test_loader, criterion) #, test_images, test_label_true, test_label_pred = evaluate(model, test_loader, criterion)
     test_precision = precision_score(test_labels, test_predictions, average=None)
     test_recall = recall_score(test_labels, test_predictions, average=None)
     test_f1_score = f1_score(test_labels, test_predictions, average=None)
@@ -189,6 +180,7 @@ for epoch in range(num_epochs):
     print(f'Test F1-Score: {test_f1_score}')
     print('----------------------------')
 
+"""
 # Directorio para guardar las imágenes
 save_dir = '/media/disk2/apenaranda/Semillero/proyecto'  # Reemplaza con el directorio donde deseas guardar las imágenes
 os.makedirs(save_dir, exist_ok=True)
@@ -209,9 +201,9 @@ for i in range(len(test_images)):
     image_pil.save(file_path)
 
     print(f'True: {label_true}\nPredicted: {label_pred}')
+"""
     
 end_time = time.time()
-
 # Cálculo del tiempo transcurrido
 elapsed_time = (end_time - start_time)/60
 print(f"Tiempo transcurrido: {elapsed_time} minutos")
