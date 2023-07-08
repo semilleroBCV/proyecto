@@ -17,9 +17,9 @@ start_time = time.time()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Carga de datos y preprocesamiento
-train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_New.csv')
-test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_New.csv')
-valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_New.csv')
+train_data = pd.read_csv('ISIC_2019_Train_data_GroundTruth_Binary.csv')
+test_data = pd.read_csv('ISIC_2019_Test_data_GroundTruth_Binary.csv')
+valid_data = pd.read_csv('ISIC_2019_Valid_data_GroundTruth_Binary.csv')
 
 transform = transforms.Compose([
     transforms.Resize((224, 224)),  # Redimensionar las imágenes a 224x224 (tamaño requerido por ResNet)
